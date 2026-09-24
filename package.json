@@ -1,6 +1,6 @@
 {
   "name": "komode",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Code-mode agent runtime for TypeScript: the model writes code against your tools, run in an in-process QuickJS sandbox. Skills, MCP, and drop-in tools for the Vercel AI SDK and OpenAI Agents SDK.",
   "license": "MIT",
   "author": "Mohamed Moustafa",

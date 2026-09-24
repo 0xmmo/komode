@@ -48,7 +48,7 @@ export interface McpConnection {
   close(): Promise<void>;
 }
 
-const VERSION = "0.1.1";
+const VERSION = "0.1.2";
 
 export async function connectMcp(opts: ConnectMcpOptions): Promise<McpConnection> {
   const transport = await createTransport(opts.server);

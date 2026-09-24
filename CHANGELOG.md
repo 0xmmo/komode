@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- README: the benchmark table shows the exact questions.
+
 ## 0.1.1
 
 - README rewritten in ASD-STE100, with benchmark results against plain tool calling.
