@@ -7,6 +7,7 @@
 (    .'
  )  (       code mode agent
 ```
+
 **Code mode for TypeScript agents.** Your tools become a typed TypeScript API; the model writes
 one script that calls them, and komode runs it in an in-process QuickJS sandbox.
 
