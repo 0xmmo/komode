@@ -2,7 +2,9 @@
 
 ## 0.1.1
 
-- README: header art, and a note on silencing 190proof's logs.
+- README rewritten in ASD-STE100, with benchmark results against plain tool calling.
+- `npm run bench`: code mode vs plain tool calling on the same tools and model.
+- Examples: GitHub issue triage, Wikipedia research, and a paginated-API data join.
 
 ## 0.1.0
 

@@ -8,162 +8,143 @@
  )  (       code mode agent
 ```
 
-**Code mode for TypeScript agents.** Your tools become a typed TypeScript API; the model writes
-one script that calls them, and komode runs it in an in-process QuickJS sandbox.
+komode is a code-mode agent runtime for TypeScript. Your tools become a typed TypeScript API. The model writes one script that calls the tools. komode runs the script in a QuickJS sandbox, in your Node.js or Bun process.
+
+## Results
+
+We gave the same tools and the same questions to `gpt-5-mini` two times. The first time, the model called each tool directly (plain tool calling). The second time, the model used komode. Each cell is the median of 3 runs.
+
+| Task | Mode | Correct | Model calls | Tool calls | Tokens | Seconds |
+|---|---|---|---|---|---|---|
+| Join and aggregate 15 pages of an API | tool calling | 1/3 | 3 | 15 | 40,958 | 219.2 |
+| | **komode** | **3/3** | 2 | 15 | **3,731** | **18.8** |
+| Read 30 items and add the totals | tool calling | 3/3 | 2 | 30 | 4,159 | 33.4 |
+| | **komode** | 3/3 | 2 | 30 | **3,009** | **14.2** |
+| Read 1 item | tool calling | 3/3 | 2 | 1 | **420** | **2.8** |
+| | komode | 3/3 | 2 | 1 | 2,009 | 8.7 |
+
+When a task has many tool calls or large results, komode is faster, uses fewer tokens and gives more correct answers. When a task has one tool call, plain tool calling is better. To run the benchmark, use `npm run bench`.
+
+## Why code mode works
+
+With plain tool calling, each tool result goes into the context of the model. The model then copies values from the context into the next call. Each page of a 12-page result stays in the context for all later calls.
+
+With code mode, the model writes a script. Loops, joins and `Promise.all` occur in the sandbox. Large results stay in variables. Only the value that the script returns goes to the model.
+
+Models know TypeScript well. A typed API with JSDoc is easy for a model to read and use correctly.
+
+## What the model sees
+
+komode changes each tool into a TypeScript declaration:
 
 ```ts
-const result = await agent.run("Compare the next 3 days in Cairo and Lisbon and send me a CSV");
+/**
+ * List all orders, 50 per page. Amounts are in USD. Refunded orders do not count as revenue.
+ */
+declare function listOrders(input: {
+  /** 1-based, default 1 */
+  page?: number;
+}): Promise<{
+  items: { id: string; customerId: string; /** YYYY-MM-DD */ date: string; amount: number; status: "paid" | "refunded" }[];
+  page: number;
+  totalPages: number;
+}>;
 ```
+
+For the join task above, the model wrote this script in one step (shortened here):
 
 ```ts
-// what the model writes, in one step:
-const [cairo, lisbon] = await Promise.all([
-  getForecast({ city: "Cairo", days: 3 }),
-  getForecast({ city: "Lisbon", days: 3 }),
-]);
-await saveCsv({ fileName: "forecast.csv", rows: [["day", "cairo", "lisbon"], ...cairo.map((d, i) => [d.day, `${d.highC}`, `${lisbon[i].highC}`])] });
-return { cairo, lisbon };
+const customers = await fetchAllPages(listCustomers);   // 3 pages, in parallel
+const orders = await fetchAllPages(listOrders);         // 12 pages, in parallel
+
+const eu = new Map(customers.filter((c) => c.region === "EU").map((c) => [c.id, c.name]));
+const sums = new Map();
+for (const o of orders) {
+  if (o.status !== "paid" || o.date < "2026-04-01" || o.date > "2026-06-30" || !eu.has(o.customerId)) continue;
+  sums.set(o.customerId, (sums.get(o.customerId) ?? 0) + o.amount);
+}
+return [...sums].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id, total]) => ({ name: eu.get(id), total }));
 ```
 
-- **Runs anywhere Node or Bun runs.** In-process QuickJS WASM. No containers, no Workers, no sandbox SaaS.
-- **Drop-in.** Use the sandbox alone, add one `execute_code` tool to your Vercel AI SDK or OpenAI Agents
-  app, or use the full agent.
-- **Skills.** Progressive disclosure: the model sees a one-line catalog and loads only the skills a
-  request needs, so dozens of integrations stay cheap.
-- **MCP → typed TS.** Connect an MCP server and its tools become typed functions the model can chain.
-- **Production-proven.** Extracted from the agent behind [Olly](https://olly.bot), which serves real users
-  over iMessage, SMS and the web. The budgets, guards and error messages exist because real models
-  tripped without them.
+The 600 orders did not go into the context of the model. Only the 3 results went to the model.
 
-## Why code mode
+## Quick start
 
-Classic tool calling makes the model emit one JSON call per step, wait, read the result, and emit the
-next. Every intermediate result flows through the context window. With code mode:
+1. Install komode and a model client:
 
-- **Fewer round trips.** Loops, joins and `Promise.all` happen in code, in one step.
-- **Less context.** Big results stay in the sandbox (`state.rows = data`); only the digest comes back.
-- **Better calls.** Models have seen far more real TypeScript than synthetic tool-call transcripts, and a
-  typed API with JSDoc is exactly what they're good at reading.
+   ```bash
+   npm i komode 190proof
+   ```
 
-## Install
+2. Set the API key for your model provider, for example `OPENAI_API_KEY`.
 
-```bash
-npm i komode
-# the full Agent calls models through 190proof (OpenAI, Anthropic, Google, Groq, OpenRouter, Bedrock):
-npm i 190proof
-```
+3. Write an agent:
 
-Node 20+ or Bun. Framework and MCP packages are optional peers: install only what you use.
+   ```ts
+   import { Agent, defineTool } from "komode";
 
-## 1. The full agent
+   const getWeather = defineTool<{ city: string }>({
+     name: "getWeather",
+     description: "Current weather for a city.",
+     parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
+     run: async ({ city }) => `Sunny in ${city}, 31°C`,
+   });
+
+   const agent = new Agent({ model: "openai:gpt-5-mini", tools: [getWeather] });
+   const { text } = await agent.run("Is it warmer in Cairo or Lisbon?");
+   ```
+
+komode needs Node.js 20 or later, or Bun.
+
+## Three ways to use komode
+
+You can use each layer alone. The framework packages and the MCP package are optional peer dependencies. Install only the packages that you use.
+
+| Layer | Import | Use it when |
+|---|---|---|
+| Agent | `komode` | You want a full agent with skills. |
+| Framework tool | `komode/ai-sdk`, `komode/openai-agents` | You have an agent. You want to add code mode to it. |
+| Sandbox | `komode/sandbox` | You want to run model code with your functions. You do not need an LLM. |
+
+### 1. The agent
 
 ```ts
-import { Agent, defineSkill, defineTool } from "komode";
-
-const getWeather = defineTool<{ city: string }>({
-  name: "getWeather",
-  description: "Current weather for a city.",
-  parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
-  run: async ({ city }) => `Sunny in ${city}, 31°C`,
-});
+import { Agent, defineSkill } from "komode";
 
 const agent = new Agent({
-  model: "anthropic:claude-sonnet-5", // any 190proof model string
+  model: "anthropic:claude-sonnet-5",        // any 190proof model string
   instructions: "You are a concise assistant.",
-  skills: [defineSkill({ name: "weather", description: "Weather lookups", tools: [getWeather] })],
+  tools: [whoAmI],                           // always available
+  skills: [calendar, email, github],         // loaded when the model asks for them
 });
 
-const { text, files, steps, usage } = await agent.run("Weather in Cairo?");
-```
-
-The model sees two functions. `use_skills` loads skills' instructions and typed APIs.
-`execute_code` runs TypeScript with every loaded function as an async global. The run ends when the
-model replies in plain text.
-
-### State, contexts, events
-
-```ts
-type State = { userId: string };
-
-const agent = new Agent<State>({
-  model: "openai:gpt-5",
-  instructions: (s) => `You're helping ${s.userId}.`,
-  contexts: [defineContext({ tag: "user_prefs", build: (s) => loadPrefs(s.userId) })],
-  tools: [whoAmI],              // always available, no skill needed
-  skills: [calendar, email],    // loaded on demand
-});
-
-await agent.run(messages, {
-  state: { userId: "u_42" },    // handed to every tool, context and instructions fn
-  signal: controller.signal,    // cancels model calls and in-flight tools
-  onEvent: (e) => {             // model_call, narration, skills_loaded, code, tool_call, tool_result, fetch, code_result
-    if (e.type === "narration") sendProgress(e.text);
-  },
+const { text, files, steps, usage } = await agent.run(messages, {
+  state: { userId: "u_42" },                 // sent to each tool
+  signal: controller.signal,                 // stops the run
+  onEvent: (e) => console.log(e.type),       // model_call, narration, tool_call, and more
 });
 ```
 
-### Tools: object or class
+The model sees two functions:
 
-```ts
-// object form
-const search = defineTool<{ q: string }, State>({
-  name: "search",
-  description: "Search the docs. Returns the top hits.",
-  parameters: { type: "object", properties: { q: { type: "string" } }, required: ["q"] },
-  returns: { type: "array", items: { type: "object", properties: { title: { type: "string" }, url: { type: "string" } } } },
-  run: async ({ q }, { state, signal }) => searchDocs(q, { user: state.userId, signal }),
-});
+- `use_skills` loads the instructions and the typed API of one or more skills.
+- `execute_code` runs TypeScript. Each loaded function is an async global.
 
-// class form, constructed per call
-class SendEmail extends BaseTool<State, { to: string; body: string }> {
-  static schema = { name: "sendEmail", description: "Send an email.", parameters: { /* … */ } };
-  async execute({ to, body }) {
-    await mailer.send(this.state.userId, to, body);
-    return "sent";
-  }
-}
-```
+The run stops when the model replies with text.
 
-A tool returns any JSON value (typed for the model by `returns`) and throws to fail. Return
-`toolResult({ value, files, images, endTurn })` to attach files to the reply, show the model an image,
-or end the run from inside a script.
+### 2. A tool for your framework
 
-### Per-skill model and budget
-
-```ts
-defineSkill({ name: "coding", description: "Write and run code", tools: [...], model: "anthropic:claude-opus-5", maxExecuteCalls: 25 });
-```
-
-While a skill is loaded its `model` runs the loop (last loaded wins), and `maxExecuteCalls` can raise
-the run's code budget. Image-bearing steps route to `visionModel` unless the override accepts images
-(`imageCapable`).
-
-### Bring your own model client
-
-```ts
-new Agent({
-  model: "anthropic:claude-sonnet-5",
-  callModel: async (request, defaultCall) => {
-    const res = await defaultCall(request);   // or call anything returning the same shape
-    meter(res.usage);
-    return res;
-  },
-});
-```
-
-## 2. Code mode in your framework
-
-### Vercel AI SDK
+Vercel AI SDK:
 
 ```ts
 import { generateText, stepCountIs } from "ai";
 import { codeModeTool } from "komode/ai-sdk";
 
-const execute_code = codeModeTool({ tools: [listSkus, getItem], mcp: [github] });
+const execute_code = codeModeTool({ tools: [listCustomers, listOrders] });
 const { text } = await generateText({ model, tools: { execute_code }, stopWhen: stepCountIs(5), prompt });
 ```
 
-### OpenAI Agents SDK
+OpenAI Agents SDK:
 
 ```ts
 import { Agent, run } from "@openai/agents";
@@ -172,28 +153,9 @@ import { codeModeTool } from "komode/openai-agents";
 const agent = new Agent({ name: "analyst", tools: [codeModeTool({ tools: [searchOrders] })] });
 ```
 
-### Anything else
+Other frameworks: `createCodeModeTool()` gives a JSON-schema tool with `name`, `description`, `parameters` and `execute({ code })`. The description contains the TypeScript declarations.
 
-`createCodeModeTool()` returns `{ name, description, parameters, execute({ code }) }`: a plain JSON-schema
-tool. The description carries the generated TypeScript declarations. `execute` resolves with the text
-the model reads back and never throws for model mistakes.
-
-## 3. MCP servers
-
-```ts
-import { connectMcp, mcpSkill } from "komode/mcp";
-
-const github = await connectMcp({ name: "github", server: { url: "https://…/mcp", headers: { Authorization: `Bearer ${token}` } } });
-codeModeTool({ mcp: [github] });                                             // as globals in your framework
-
-const notes = await mcpSkill({ name: "notes", server: { command: "npx", args: ["-y", "some-mcp-server"] } });
-new Agent({ model, skills: [notes] });                                        // as a loadable skill
-```
-
-MCP tool names become camelCase identifiers (`list-issues` → `listIssues`). `outputSchema` types the
-result and `structuredContent` becomes the value. `isError` throws and image content is shown to the model.
-
-## 4. The sandbox alone
+### 3. The sandbox
 
 ```ts
 import { createSandbox } from "komode/sandbox";
@@ -201,48 +163,118 @@ import { createSandbox } from "komode/sandbox";
 const sb = await createSandbox({ bindings: { getPrice: async ({ ticker }) => prices[ticker] } });
 const { ok, returnValue, logs, error } = await sb.run(`
   const q = await Promise.all(["AAPL", "MSFT"].map((t) => getPrice({ ticker: t })));
-  state.q = q;           // persists across runs
+  state.q = q;           // state stays between runs
   return q;
 `);
 sb.dispose();
 ```
 
-## Security model
+## Tools, skills and contexts
 
-- **No ambient authority.** Guest code runs in QuickJS (WASM) with no filesystem, no process, no
-  modules, and no network unless `fetch` is enabled. The functions you pass are its only capabilities,
-  so authorization belongs in your tools.
-- **Guarded fetch** (Agent default on, `createSandbox` default off): GET/HEAD only, public http(s) URLs
-  only. It is SSRF-checked on every redirect hop and at DNS-connect time (no rebinding), capped at 2 MB,
-  10 s and 16 per run.
-- **Limits.** Wall-clock time per run (tool calls included), CPU time per synchronous slice, a heap cap,
-  a tool fan-out cap, and log/return truncation. A timed-out or leaky run is torn down so it can never
-  resume inside the next one.
-- **What it is not.** In-process isolation is weaker than a VM. For untrusted multi-tenant code with
-  hostile tools in reach, run the agent in its own process or container. The `Executor` interface is
-  the seam for a remote executor.
+A **tool** is a function with a JSON schema. Make one with `defineTool`, or extend `BaseTool` if the tool needs its own class.
 
-## Defaults
+```ts
+const search = defineTool<{ q: string }, State>({
+  name: "search",
+  description: "Search the docs. Returns the top hits.",
+  parameters: { type: "object", properties: { q: { type: "string" } }, required: ["q"] },
+  returns: { type: "array", items: { type: "object", properties: { title: { type: "string" }, url: { type: "string" } } } },
+  run: async ({ q }, { state, signal }) => searchDocs(q, { user: state.userId, signal }),
+});
+```
 
-| limit | default | option |
-|---|---|---|
-| execute_code calls per run | 10 | `limits.maxExecuteCalls` (skills can raise it) |
-| use_skills calls per run | 2 | `limits.maxUseSkillsCalls` |
-| tool calls per execute_code | 25 | `limits.maxToolCallsPerRun` |
-| wall clock per execute_code | 120 s | `sandbox.timeoutMs` |
-| guest heap | 64 MB | `sandbox.memoryLimitBytes` |
-| return value shown to the model | 50,000 chars | `limits.maxReturnChars` |
+- A tool returns a JSON value. The `returns` schema gives the value a type for the model.
+- A tool throws an error when it fails. The script of the model receives the error.
+- To attach files, show an image to the model or stop the run, return `toolResult({ value, files, images, endTurn })`.
 
-## Notes
+A **skill** is a group of tools with instructions. At the start, the model sees only the name and description of each skill. The model loads a skill when it needs it. Thus, an agent can have many integrations and still use a small prompt.
 
-- `typescript` is a runtime dependency (it strips types from model code before QuickJS runs it).
-- 190proof logs every model call to the console. Silence or reroute it with `setLogger(null)` / `setLogger(yourLogger)` from `190proof` (>= 1.0.120). Model errors surfaced by the Agent never include request headers.
-- On Bun, `fetch` decodes GBK/gb18030 bodies as UTF-8 because Bun's `TextDecoder` lacks those encodings.
+```ts
+defineSkill({
+  name: "coding",
+  description: "Write and run code",
+  instructions: "Run the tests after each change.",
+  tools: [readFile, writeFile, runTests],
+  model: "anthropic:claude-opus-5",   // optional: this model runs the loop while the skill is loaded
+  maxExecuteCalls: 25,                // optional: more execute_code calls for this skill
+});
+```
+
+A **context** puts data in the prompt, for example the preferences of a user. Make one with `defineContext` or `BaseContext`.
+
+## MCP servers
+
+komode connects to an MCP server and changes each MCP tool into a typed function.
+
+```ts
+import { connectMcp, mcpSkill } from "komode/mcp";
+
+const github = await connectMcp({ name: "github", server: { url: "https://…/mcp", headers: { Authorization: `Bearer ${token}` } } });
+codeModeTool({ mcp: [github] });
+
+const notes = await mcpSkill({ name: "notes", server: { command: "npx", args: ["-y", "some-mcp-server"] } });
+new Agent({ model, skills: [notes] });
+```
+
+- komode changes MCP tool names into camelCase names. For example, `list-issues` becomes `listIssues`.
+- If the MCP tool has an `outputSchema`, komode uses it as the return type.
+- If the MCP tool returns `isError`, the function throws an error.
 
 ## Examples
 
-See [`examples/`](examples): sandbox only, AI SDK, OpenAI Agents, the full agent with files and state,
-and an MCP skill.
+| Example | Workload | Needs |
+|---|---|---|
+| [`01-sandbox-only`](examples/01-sandbox-only.ts) | Run code with host functions | Nothing |
+| [`02-ai-sdk`](examples/02-ai-sdk.ts) | Code mode in the Vercel AI SDK | `OPENAI_API_KEY` |
+| [`03-openai-agents`](examples/03-openai-agents.ts) | Code mode in the OpenAI Agents SDK | `OPENAI_API_KEY` |
+| [`04-agent`](examples/04-agent.ts) | Skills, state, contexts and a file attachment | `OPENAI_API_KEY` |
+| [`05-mcp`](examples/05-mcp.ts) | An MCP server as a skill | `OPENAI_API_KEY` |
+| [`06-github-triage`](examples/06-github-triage.ts) | Triage the open issues of a real GitHub repo | `OPENAI_API_KEY`, optional `GITHUB_TOKEN` |
+| [`07-research`](examples/07-research.ts) | Read 6 full Wikipedia articles and compare facts | `OPENAI_API_KEY` |
+| [`08-data-join`](examples/08-data-join.ts) | Join and aggregate a paginated API | `OPENAI_API_KEY` |
+
+In one run of `07-research`, the tools fetched 129,119 characters of article text. The model read 4,790 characters of script output.
+
+To run an example, use `npx tsx examples/08-data-join.ts`.
+
+## Security
+
+- **No access by default.** Model code runs in QuickJS (WebAssembly). It has no file system, no processes, no modules and no network. Your functions are its only access. Thus, put authorization checks in your tools.
+- **Guarded fetch.** The agent gives model code a `fetch` function. This function uses only GET and HEAD, and only public http(s) URLs. komode checks each redirect and each DNS result. Private addresses are blocked. The limits are 2 MB, 10 seconds and 16 requests for each run. To disable `fetch`, set `sandbox: { fetch: false }`.
+- **Limits.** Each run has a wall-clock limit, a CPU limit, a memory limit and a tool-call limit. If a run exceeds a limit, komode stops it and makes a new VM.
+- **In-process isolation.** QuickJS runs in your process. This isolation is weaker than a virtual machine. If untrusted users send code and your tools can cause damage, run the agent in a separate container. The `Executor` interface lets you add a remote executor.
+
+## When not to use komode
+
+- **Tasks with one tool call.** Plain tool calling is faster and uses fewer tokens. See [Results](#results).
+- **Streamed replies.** The agent does not stream the reply token by token yet.
+- **Approval before an action.** The agent cannot stop before a tool and ask a person for approval yet. Put the approval step in the tool.
+
+## Other code-mode runtimes
+
+| Runtime | Language | Where the code runs |
+|---|---|---|
+| komode | TypeScript | QuickJS in your Node.js or Bun process |
+| [`@cloudflare/codemode`](https://developers.cloudflare.com/agents/api-reference/codemode/) | TypeScript | Cloudflare Workers |
+| [smolagents](https://github.com/huggingface/smolagents) `CodeAgent` | Python | A local Python interpreter or a remote sandbox |
+
+## Limits
+
+| Limit | Default | Option |
+|---|---|---|
+| `execute_code` calls in a run | 10 | `limits.maxExecuteCalls` (a skill can increase it) |
+| `use_skills` calls in a run | 2 | `limits.maxUseSkillsCalls` |
+| Tool calls in one `execute_code` | 25 | `limits.maxToolCallsPerRun` |
+| Time for one `execute_code` | 120 s | `sandbox.timeoutMs` |
+| Memory of the sandbox | 64 MB | `sandbox.memoryLimitBytes` |
+| Characters of a return value | 50,000 | `limits.maxReturnChars` |
+
+## Notes
+
+- komode uses the `typescript` package at run time. It removes the types from the code of the model before QuickJS runs it.
+- 190proof writes a log line for each model call. To stop these lines, call `setLogger(null)` from `190proof` (1.0.120 or later).
+- Bun does not decode GBK text. On Bun, `fetch` decodes GBK responses as UTF-8.
+- This README uses [ASD-STE100 Simplified Technical English](https://www.asd-ste100.org/).
 
 ## License
 
