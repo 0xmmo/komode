@@ -14,13 +14,13 @@ komode is a code-mode agent runtime for TypeScript. Your tools become a typed Ty
 
 We gave the same tools and the same questions to `gpt-5-mini` two times. The first time, the model called each tool directly (plain tool calling). The second time, the model used komode. Each cell is the median of 3 runs.
 
-| Task | Mode | Correct | Model calls | Tool calls | Tokens | Seconds |
+| Question | Mode | Correct | Model calls | Tool calls | Tokens | Seconds |
 |---|---|---|---|---|---|---|
-| Join and aggregate 15 pages of an API | tool calling | 1/3 | 3 | 15 | 40,958 | 219.2 |
+| "Which 3 EU customers had the highest paid revenue in Q2?" (3 pages of customers, 12 pages of orders) | tool calling | 1/3 | 3 | 15 | 40,958 | 219.2 |
 | | **komode** | **3/3** | 2 | 15 | **3,731** | **18.8** |
-| Read 30 items and add the totals | tool calling | 3/3 | 2 | 30 | 4,159 | 33.4 |
+| "What is the total inventory value of SKU-001 to SKU-030, and which SKUs are out of stock?" (30 lookups) | tool calling | 3/3 | 2 | 30 | 4,159 | 33.4 |
 | | **komode** | 3/3 | 2 | 30 | **3,009** | **14.2** |
-| Read 1 item | tool calling | 3/3 | 2 | 1 | **420** | **2.8** |
+| "What is the unit price of SKU-007?" (1 lookup) | tool calling | 3/3 | 2 | 1 | **420** | **2.8** |
 | | komode | 3/3 | 2 | 1 | 2,009 | 8.7 |
 
 When a task has many tool calls or large results, komode is faster, uses fewer tokens and gives more correct answers. When a task has one tool call, plain tool calling is better. To run the benchmark, use `npm run bench`.
