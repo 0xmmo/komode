@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- README: header art, and a note on silencing 190proof's logs.
+
 ## 0.1.0
 
 First release.
