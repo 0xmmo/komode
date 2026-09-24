@@ -228,6 +228,7 @@ sb.dispose();
 ## Notes
 
 - `typescript` is a runtime dependency (it strips types from model code before QuickJS runs it).
+- 190proof logs every model call to the console. Silence or reroute it with `setLogger(null)` / `setLogger(yourLogger)` from `190proof` (>= 1.0.120). Model errors surfaced by the Agent never include request headers.
 - On Bun, `fetch` decodes GBK/gb18030 bodies as UTF-8 because Bun's `TextDecoder` lacks those encodings.
 
 ## Examples
