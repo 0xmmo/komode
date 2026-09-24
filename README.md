@@ -5,7 +5,7 @@
     | |                   ┣┻┓┃ ┃┃┃┃┃ ┃ ┃┃┣╸
  ___| |                   ╹ ╹┗━┛╹ ╹┗━┛╺┻┛┗━╸
 (    .'
- )  (                     code mode for TypeScript agents
+ )  (                     code mode agent
                      rr
 ```
 <sub>toilet by Randy Ransom (rr), logo rendered with <a href="http://caca.zoy.org/wiki/toilet">toilet(1)</a></sub>
