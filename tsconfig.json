@@ -3,8 +3,13 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022", "DOM"],
-    "types": ["node"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "node"
+    ],
     "strict": true,
     "noUncheckedIndexedAccess": false,
     "esModuleInterop": true,
@@ -13,7 +18,29 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "komode": [
+        "./src/index.ts"
+      ],
+      "komode/sandbox": [
+        "./src/sandbox/index.ts"
+      ],
+      "komode/mcp": [
+        "./src/mcp/index.ts"
+      ],
+      "komode/ai-sdk": [
+        "./src/adapters/ai-sdk.ts"
+      ],
+      "komode/openai-agents": [
+        "./src/adapters/openai-agents.ts"
+      ]
+    }
   },
-  "include": ["src", "test", "examples"]
+  "include": [
+    "src",
+    "test",
+    "examples"
+  ]
 }
