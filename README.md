@@ -1,12 +1,11 @@
 # komode
 
 ```
-     _                    ╻┏ ┏━┓┏┳┓┏━┓╺┳┓┏━╸
-    | |                   ┣┻┓┃ ┃┃┃┃┃ ┃ ┃┃┣╸
- ___| |                   ╹ ╹┗━┛╹ ╹┗━┛╺┻┛┗━╸
+     _      ╻┏ ┏━┓┏┳┓┏━┓╺┳┓┏━╸
+    | |     ┣┻┓┃ ┃┃┃┃┃ ┃ ┃┃┣╸
+ ___| |     ╹ ╹┗━┛╹ ╹┗━┛╺┻┛┗━╸
 (    .'
- )  (                     code mode agent
-                     rr
+ )  (       code mode agent
 ```
 <sub>toilet by Randy Ransom (rr), logo rendered with <a href="http://caca.zoy.org/wiki/toilet">toilet(1)</a></sub>
 
