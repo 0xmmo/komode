@@ -1,5 +1,15 @@
 # komode
 
+```
+     _                    ╻┏ ┏━┓┏┳┓┏━┓╺┳┓┏━╸
+    | |                   ┣┻┓┃ ┃┃┃┃┃ ┃ ┃┃┣╸
+ ___| |                   ╹ ╹┗━┛╹ ╹┗━┛╺┻┛┗━╸
+(    .'
+ )  (                     code mode for TypeScript agents
+                     rr
+```
+<sub>toilet by Randy Ransom (rr), logo rendered with <a href="http://caca.zoy.org/wiki/toilet">toilet(1)</a></sub>
+
 **Code mode for TypeScript agents.** Your tools become a typed TypeScript API; the model writes
 one script that calls them, and komode runs it in an in-process QuickJS sandbox.
 
