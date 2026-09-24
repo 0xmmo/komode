@@ -1,0 +1,111 @@
+{
+  "name": "komode",
+  "version": "0.1.0",
+  "description": "Code-mode agent runtime for TypeScript: the model writes code against your tools, run in an in-process QuickJS sandbox. Skills, MCP, and drop-in tools for the Vercel AI SDK and OpenAI Agents SDK.",
+  "license": "MIT",
+  "author": "Mohamed Moustafa",
+  "homepage": "https://github.com/0xmmo/komode#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0xmmo/komode.git"
+  },
+  "bugs": "https://github.com/0xmmo/komode/issues",
+  "keywords": [
+    "agent",
+    "agents",
+    "code-mode",
+    "codemode",
+    "llm",
+    "ai",
+    "sandbox",
+    "quickjs",
+    "mcp",
+    "tools",
+    "skills",
+    "typescript",
+    "ai-sdk",
+    "openai-agents"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./sandbox": {
+      "import": "./dist/sandbox.js",
+      "require": "./dist/sandbox.cjs"
+    },
+    "./mcp": {
+      "import": "./dist/mcp.js",
+      "require": "./dist/mcp.cjs"
+    },
+    "./ai-sdk": {
+      "import": "./dist/ai-sdk.js",
+      "require": "./dist/ai-sdk.cjs"
+    },
+    "./openai-agents": {
+      "import": "./dist/openai-agents.js",
+      "require": "./dist/openai-agents.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:bun": "bun --bun vitest run",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@jitl/quickjs-wasmfile-release-sync": "^0.32.0",
+    "axios": "^1.12.0",
+    "ipaddr.js": "^2.2.0",
+    "quickjs-emscripten-core": "^0.32.0",
+    "typescript": "~5.9.3"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": ">=1.20.0",
+    "@openai/agents": ">=0.1.0",
+    "190proof": ">=1.0.119",
+    "ai": ">=5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "190proof": {
+      "optional": true
+    },
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
+    "@openai/agents": {
+      "optional": true
+    },
+    "ai": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@ai-sdk/openai": "^4.0.74",
+    "@modelcontextprotocol/sdk": "^1.30.1",
+    "@openai/agents": "^0.18.0",
+    "@types/node": "^24.0.0",
+    "190proof": "^1.0.119",
+    "ai": "^7.0.113",
+    "tsup": "^8.5.1",
+    "tsx": "^4.20.0",
+    "vitest": "^5.0.1",
+    "zod": "^4.6.5"
+  }
+}
